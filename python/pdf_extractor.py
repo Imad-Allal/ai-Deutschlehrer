@@ -1,6 +1,6 @@
 import PyPDF2
 
-PDF_FILE_PATH = "pdf/sample.pdf"
+PDF_FILE_PATH = "../pdf/sample.pdf"
 
 def extract_text(file_path):
     with open(file_path, 'rb') as file:
