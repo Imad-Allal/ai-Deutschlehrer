@@ -26,11 +26,11 @@ chat_completion = client.chat.completions.create(
         },
         {
             "role": "user",
-            "content": "Sentence: Als sie die Überraschungsparty sah, war sie völlig aus dem Häuschen!",
+            "content": "Sentence: Hohe Kosten und strenge Vorgaben erschweren die Busfahrerausbildung in Deutschland.",
         },
         {
             "role": "user",
-            "content": "Word to translate: Häuschen",
+            "content": "Word to translate: Kosten",
         }
     ],
     model="llama-3.3-70b-versatile",

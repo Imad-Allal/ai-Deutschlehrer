@@ -1,0 +1,31 @@
+{
+    "manifest_version": 3,
+    "name": "Contextual Translator",
+    "version": "1.1",
+    "description": "Translate words based on context",
+    "permissions": [
+        "storage",
+        "activeTab",
+        "scripting",
+        "contextMenus"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "action": {
+        "default_popup": "popup.html"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ]
+}
