@@ -4,12 +4,89 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="styles.css" />
-    <title>Translator</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <title>Contextual Translator</title>
   </head>
   <body>
     <div class="container">
-      <h2>Translation</h2>
-      <p id="translation">Select a word...</p>
+      <header>
+        <div class="logo-container">
+          <div class="logo">CT</div>
+          <h1>Contextual Translator</h1>
+        </div>
+        <div class="search-box">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Search saved words..."
+          />
+          <i class="fas fa-search"></i>
+        </div>
+      </header>
+
+      <div class="tab-container">
+        <button class="tab-btn active" data-tab="saved">Saved Words</button>
+        <button class="tab-btn" data-tab="settings">Settings</button>
+      </div>
+
+      <div class="content-container">
+        <div id="saved-tab" class="tab-content active">
+          <div class="words-container">
+            <ul id="savedWordsList"></ul>
+          </div>
+          <div class="empty-state" id="emptyState">
+            <i class="fas fa-book"></i>
+            <p>No saved words yet</p>
+            <small
+              >Highlight text on any webpage and click "Translate" to add
+              words</small
+            >
+          </div>
+        </div>
+
+        <div id="settings-tab" class="tab-content">
+          <div class="setting-item">
+            <div class="setting-info">
+              <h3>Highlight Color</h3>
+              <p>Choose your preferred highlight color</p>
+            </div>
+            <select id="highlightColor">
+              <option value="#ffde59">Yellow</option>
+              <option value="#90ee90">Light Green</option>
+              <option value="#add8e6">Light Blue</option>
+              <option value="#ffb6c1">Pink</option>
+              <option value="#d8bfd8">Lavender</option>
+            </select>
+          </div>
+
+          <div class="setting-item">
+            <div class="setting-info">
+              <h3>Export Words</h3>
+              <p>Download your saved words as CSV</p>
+            </div>
+            <button id="exportBtn" class="action-btn">
+              <i class="fas fa-download"></i> Export
+            </button>
+          </div>
+
+          <div class="setting-item">
+            <div class="setting-info">
+              <h3>Clear Data</h3>
+              <p>Remove all saved words</p>
+            </div>
+            <button id="clearAllBtn" class="action-btn danger">
+              <i class="fas fa-trash"></i> Clear
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <span>Words saved: <span id="wordCount">0</span></span>
+      </footer>
     </div>
     <script src="popup.js"></script>
   </body>
