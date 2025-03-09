@@ -2,11 +2,21 @@ let translateButton;
 let currentTooltip;
 let highlightingEnabled = true; // Flag to control highlighting feature
 let currentSelection = null; // Store the current selection
-let extensionEnabled = true; // New flag to control the extension's state
+let extensionEnabled = true; // Default to enabled
+
+// Check if the extension is enabled
+function checkExtensionEnabled() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get({ extensionEnabled: true }, (data) => {
+            extensionEnabled = data.extensionEnabled;
+            resolve(extensionEnabled);
+        });
+    });
+}
 
 // Create the floating button
 function createTranslateButton(x, y) {
-    // Don't create UI if extension is disabled
+    // If extension is disabled, don't create the button
     if (!extensionEnabled) return;
     
     // Remove any existing buttons and tooltips
@@ -98,6 +108,7 @@ function findSentenceFromSelection(selection) {
 
 // Show loading indicator
 function showLoading(x, y) {
+    // If extension is disabled, don't show loading
     if (!extensionEnabled) return;
     
     removeExistingUI();
@@ -116,7 +127,9 @@ function showLoading(x, y) {
 
 // Highlight only the currently selected text
 function highlightCurrentSelection() {
-    if (!extensionEnabled || !highlightingEnabled) return;
+    // If extension is disabled, don't highlight
+    if (!extensionEnabled) return;
+    
     if (!currentSelection || !currentSelection.rangeCount) return;
 
     const range = currentSelection.getRangeAt(0);
@@ -224,7 +237,8 @@ function getElementByXPath(xpath) {
 
 // Highlight all saved words on page load
 function restoreHighlights() {
-    if (!extensionEnabled || !highlightingEnabled) return;
+    // If extension is disabled, don't restore highlights
+    if (!extensionEnabled) return;
     
     chrome.storage.local.get({ pageHighlights: {}, savedTranslations: [] }, (result) => {
         const pageHighlights = result.pageHighlights;
@@ -380,7 +394,11 @@ function updateHighlightXPath(word, newXPath) {
 }
 
 // Show the button when text is selected
-document.addEventListener("mouseup", (event) => {
+document.addEventListener("mouseup", async (event) => {
+    // Check if extension is enabled first
+    await checkExtensionEnabled();
+    
+    // If extension is disabled, don't show button
     if (!extensionEnabled) return;
     
     setTimeout(() => {
@@ -441,8 +459,33 @@ function isMouseOverElement(event, element) {
 }
 
 // Listen for translation response from background
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     console.log("Message received in content script:", request);
+
+    // Handle extension state changes immediately
+    if (request.type === "extensionStateChanged") {
+        extensionEnabled = request.enabled;
+        console.log(`Extension enabled state changed to: ${extensionEnabled}`);
+        
+        // If disabled, remove any existing UI
+        if (!extensionEnabled) {
+            removeExistingUI();
+            // Remove all highlights from page
+            removeAllHighlights();
+        } else {
+            // If enabled, restore highlights
+            restoreHighlights();
+        }
+        
+        return true;
+    }
+    
+    // For all other message types, first check if extension is enabled
+    await checkExtensionEnabled();
+    if (!extensionEnabled) {
+        console.log("Extension is disabled. Ignoring message:", request.type);
+        return true;
+    }
 
     if (request.type === "showTranslation") {
         // Highlight the selection first, then show tooltip
@@ -465,25 +508,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.type === "removeHighlight") {
         // Remove specific highlight
         removeHighlightByWord(request.word);
-    } else if (request.type === "toggleExtension") {
-        // Toggle extension state
-        extensionEnabled = request.enabled;
-        console.log(`Extension ${extensionEnabled ? 'enabled' : 'disabled'}`);
-        
-        // If disabled, remove all UI elements and highlights
-        if (!extensionEnabled) {
-            removeExistingUI();
-            removeAllHighlights();
-        } else {
-            // If enabled, restore highlights
-            restoreHighlights();
-        }
-        
-        // Save extension state
-        chrome.storage.local.set({ extensionEnabled: extensionEnabled });
-        
-        // Send response to confirm action was completed
-        sendResponse({ success: true });
     }
 
     return true;
@@ -593,8 +617,6 @@ function injectHighlightStyles() {
 
 // Display translation tooltip
 function showTooltip(text, x, y) {
-    if (!extensionEnabled) return;
-    
     removeExistingUI();
     currentTooltip = document.createElement("div");
     currentTooltip.innerText = text;
@@ -624,8 +646,6 @@ function showTooltip(text, x, y) {
 
 // Listen for clicks outside the UI elements
 document.addEventListener("click", (event) => {
-    if (!extensionEnabled) return;
-    
     if (!isMouseOverElement(event, currentTooltip) && !isMouseOverElement(event, translateButton)) {
         removeExistingUI();
     }
@@ -633,6 +653,7 @@ document.addEventListener("click", (event) => {
 
 // Add click handler for removing highlighted words when clicked
 document.addEventListener('click', (event) => {
+    // Check if extension is enabled
     if (!extensionEnabled) return;
     
     if (!event.target.classList.contains('highlighted-word')) return;
@@ -677,20 +698,47 @@ function removeHighlightFromStorage(word) {
     });
 }
 
-// Initialize on page load
-function initialize() {
-    // Check if extension is enabled from storage
-    chrome.storage.local.get({ extensionEnabled: true }, (data) => {
-        extensionEnabled = data.extensionEnabled;
-        console.log(`Extension is ${extensionEnabled ? 'enabled' : 'disabled'} on initialization`);
-        
-        if (extensionEnabled) {
-            injectHighlightStyles();
-            // Restore highlights from storage
-            restoreHighlights();
-            console.log("Translator extension initialized");
+// Add custom CSS for highlights
+function injectHighlightStyles() {
+    if (document.getElementById('translator-highlight-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'translator-highlight-styles';
+    style.textContent = `
+        .highlighted-word {
+            background-color: #ffde59 !important;
+            color: black !important;
+            padding: 0 2px !important;
+            border-radius: 3px !important;
+            cursor: pointer !important;
+            display: inline !important;
+            position: relative !important;
+            z-index: 1 !important;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.1) !important;
+            transition: background-color 0.2s ease !important;
         }
-    });
+        
+        .highlighted-word:hover {
+            background-color: #ffa726 !important;
+        }
+    `;
+    document.head.appendChild(style);
+    console.log("Highlight styles injected");
+}
+
+// Initialize on page load
+async function initialize() {
+    // First check if extension is enabled
+    await checkExtensionEnabled();
+    
+    injectHighlightStyles();
+    
+    // Only restore highlights if extension is enabled
+    if (extensionEnabled) {
+        restoreHighlights();
+    }
+    
+    console.log(`Translator extension initialized (enabled: ${extensionEnabled})`);
 }
 
 // Initialize on script load
@@ -732,6 +780,7 @@ const observeDOM = (function () {
 // Use the mutation observer to detect when we might need to refresh highlights
 // This is useful for single-page applications where content changes dynamically
 observeDOM(document.body, function (mutations) {
+    // Don't refresh if extension is disabled
     if (!extensionEnabled) return;
     
     // Throttle the refresh to prevent performance issues
