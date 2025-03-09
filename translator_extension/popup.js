@@ -8,6 +8,86 @@ document.addEventListener("DOMContentLoaded", () => {
     const highlightColorSelect = document.getElementById("highlightColor");
     const exportBtn = document.getElementById("exportBtn");
     const clearAllBtn = document.getElementById("clearAllBtn");
+    const extensionToggle = document.getElementById("extensionToggle");
+    const settingsToggle = document.getElementById("settingsToggle");
+    const statusText = document.getElementById("statusText");
+
+    // Load extension enabled state
+    chrome.storage.local.get({ extensionEnabled: true }, (data) => {
+        const isEnabled = data.extensionEnabled;
+        extensionToggle.checked = isEnabled;
+        settingsToggle.checked = isEnabled;
+        updateStatusText(isEnabled);
+        
+        // Update badge based on enabled state
+        updateExtensionBadge(isEnabled);
+    });
+
+    // Function to update status text appearance
+    function updateStatusText(isEnabled) {
+        statusText.textContent = isEnabled ? "Enabled" : "Disabled";
+        if (isEnabled) {
+            statusText.classList.remove("disabled-state");
+        } else {
+            statusText.classList.add("disabled-state");
+        }
+    }
+
+    // Function to update extension badge
+    function updateExtensionBadge(isEnabled) {
+        if (isEnabled) {
+            chrome.action.setBadgeText({ text: "" });
+        } else {
+            chrome.action.setBadgeText({ text: "OFF" });
+            chrome.action.setBadgeBackgroundColor({ color: "#FF5252" });
+        }
+    }
+
+    // Extension toggle in header
+    extensionToggle.addEventListener("change", function() {
+        const isEnabled = this.checked;
+        settingsToggle.checked = isEnabled;
+        updateStatusText(isEnabled);
+        
+        // Save state to storage
+        chrome.storage.local.set({ extensionEnabled: isEnabled });
+        
+        // Update badge
+        updateExtensionBadge(isEnabled);
+        
+        // Notify content scripts about the change
+        notifyTabsAboutEnabledState(isEnabled);
+    });
+
+    // Settings page toggle
+    settingsToggle.addEventListener("change", function() {
+        const isEnabled = this.checked;
+        extensionToggle.checked = isEnabled;
+        updateStatusText(isEnabled);
+        
+        // Save state to storage
+        chrome.storage.local.set({ extensionEnabled: isEnabled });
+        
+        // Update badge
+        updateExtensionBadge(isEnabled);
+        
+        // Notify content scripts about the change
+        notifyTabsAboutEnabledState(isEnabled);
+    });
+
+    // Function to notify all open tabs about the change
+    function notifyTabsAboutEnabledState(isEnabled) {
+        chrome.tabs.query({}, (tabs) => {
+            tabs.forEach(tab => {
+                if (!tab.url.startsWith('chrome://')) {
+                    chrome.tabs.sendMessage(tab.id, {
+                        type: "extensionStateChanged",
+                        enabled: isEnabled
+                    }).catch(err => console.log(`Error sending state change to tab ${tab.id}:`, err));
+                }
+            });
+        });
+    }
 
     // Load saved highlight color
     chrome.storage.local.get({ highlightColor: "#ffde59" }, (data) => {
