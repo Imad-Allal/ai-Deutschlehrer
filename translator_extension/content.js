@@ -2,9 +2,13 @@ let translateButton;
 let currentTooltip;
 let highlightingEnabled = true; // Flag to control highlighting feature
 let currentSelection = null; // Store the current selection
+let extensionEnabled = true; // New flag to control the extension's state
 
 // Create the floating button
 function createTranslateButton(x, y) {
+    // Don't create UI if extension is disabled
+    if (!extensionEnabled) return;
+    
     // Remove any existing buttons and tooltips
     removeExistingUI();
     translateButton = document.createElement("button");
@@ -94,6 +98,8 @@ function findSentenceFromSelection(selection) {
 
 // Show loading indicator
 function showLoading(x, y) {
+    if (!extensionEnabled) return;
+    
     removeExistingUI();
     currentTooltip = document.createElement("div");
     currentTooltip.innerText = "Translating...";
@@ -110,6 +116,7 @@ function showLoading(x, y) {
 
 // Highlight only the currently selected text
 function highlightCurrentSelection() {
+    if (!extensionEnabled || !highlightingEnabled) return;
     if (!currentSelection || !currentSelection.rangeCount) return;
 
     const range = currentSelection.getRangeAt(0);
@@ -216,9 +223,9 @@ function getElementByXPath(xpath) {
 }
 
 // Highlight all saved words on page load
-// Modify the restoreHighlights function to correctly handle multiple highlighted words
-
 function restoreHighlights() {
+    if (!extensionEnabled || !highlightingEnabled) return;
+    
     chrome.storage.local.get({ pageHighlights: {}, savedTranslations: [] }, (result) => {
         const pageHighlights = result.pageHighlights;
         const url = window.location.href;
@@ -374,6 +381,8 @@ function updateHighlightXPath(word, newXPath) {
 
 // Show the button when text is selected
 document.addEventListener("mouseup", (event) => {
+    if (!extensionEnabled) return;
+    
     setTimeout(() => {
         const selection = window.getSelection();
         const selectedText = selection.toString().trim();
@@ -456,10 +465,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.type === "removeHighlight") {
         // Remove specific highlight
         removeHighlightByWord(request.word);
+    } else if (request.type === "toggleExtension") {
+        // Toggle extension state
+        extensionEnabled = request.enabled;
+        console.log(`Extension ${extensionEnabled ? 'enabled' : 'disabled'}`);
+        
+        // If disabled, remove all UI elements and highlights
+        if (!extensionEnabled) {
+            removeExistingUI();
+            removeAllHighlights();
+        } else {
+            // If enabled, restore highlights
+            restoreHighlights();
+        }
+        
+        // Save extension state
+        chrome.storage.local.set({ extensionEnabled: extensionEnabled });
+        
+        // Send response to confirm action was completed
+        sendResponse({ success: true });
     }
 
     return true;
 });
+
+// Remove all highlights from the page
+function removeAllHighlights() {
+    const highlights = document.querySelectorAll('.highlighted-word');
+    
+    highlights.forEach(el => {
+        // Replace the highlighted span with its text content
+        const text = document.createTextNode(el.textContent);
+        el.parentNode.replaceChild(text, el);
+    });
+}
 
 // Function to update highlight color
 function updateHighlightColor(color) {
@@ -554,6 +593,8 @@ function injectHighlightStyles() {
 
 // Display translation tooltip
 function showTooltip(text, x, y) {
+    if (!extensionEnabled) return;
+    
     removeExistingUI();
     currentTooltip = document.createElement("div");
     currentTooltip.innerText = text;
@@ -583,6 +624,8 @@ function showTooltip(text, x, y) {
 
 // Listen for clicks outside the UI elements
 document.addEventListener("click", (event) => {
+    if (!extensionEnabled) return;
+    
     if (!isMouseOverElement(event, currentTooltip) && !isMouseOverElement(event, translateButton)) {
         removeExistingUI();
     }
@@ -590,6 +633,8 @@ document.addEventListener("click", (event) => {
 
 // Add click handler for removing highlighted words when clicked
 document.addEventListener('click', (event) => {
+    if (!extensionEnabled) return;
+    
     if (!event.target.classList.contains('highlighted-word')) return;
 
     const word = event.target.getAttribute('data-word');
@@ -632,40 +677,20 @@ function removeHighlightFromStorage(word) {
     });
 }
 
-// Add custom CSS for highlights
-function injectHighlightStyles() {
-    if (document.getElementById('translator-highlight-styles')) return;
-
-    const style = document.createElement('style');
-    style.id = 'translator-highlight-styles';
-    style.textContent = `
-        .highlighted-word {
-            background-color: #ffde59 !important;
-            color: black !important;
-            padding: 0 2px !important;
-            border-radius: 3px !important;
-            cursor: pointer !important;
-            display: inline !important;
-            position: relative !important;
-            z-index: 1 !important;
-            box-shadow: 0 0 0 1px rgba(0,0,0,0.1) !important;
-            transition: background-color 0.2s ease !important;
-        }
-        
-        .highlighted-word:hover {
-            background-color: #ffa726 !important;
-        }
-    `;
-    document.head.appendChild(style);
-    console.log("Highlight styles injected");
-}
-
 // Initialize on page load
 function initialize() {
-    injectHighlightStyles();
-    // Restore highlights from storage
-    restoreHighlights();
-    console.log("Translator extension initialized");
+    // Check if extension is enabled from storage
+    chrome.storage.local.get({ extensionEnabled: true }, (data) => {
+        extensionEnabled = data.extensionEnabled;
+        console.log(`Extension is ${extensionEnabled ? 'enabled' : 'disabled'} on initialization`);
+        
+        if (extensionEnabled) {
+            injectHighlightStyles();
+            // Restore highlights from storage
+            restoreHighlights();
+            console.log("Translator extension initialized");
+        }
+    });
 }
 
 // Initialize on script load
@@ -707,6 +732,8 @@ const observeDOM = (function () {
 // Use the mutation observer to detect when we might need to refresh highlights
 // This is useful for single-page applications where content changes dynamically
 observeDOM(document.body, function (mutations) {
+    if (!extensionEnabled) return;
+    
     // Throttle the refresh to prevent performance issues
     if (window.highlightRefreshTimeout) {
         clearTimeout(window.highlightRefreshTimeout);
