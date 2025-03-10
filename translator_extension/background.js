@@ -7,7 +7,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 return;
             }
             
-            fetch("http://127.0.0.1:5000/translate", {
+            fetch("https://prototypec.pythonanywhere.com/translate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
