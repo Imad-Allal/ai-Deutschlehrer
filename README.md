@@ -1,4 +1,4 @@
-# el-hessoub
+# AI Deutschlehrer
 
 ## Getting Started
 
